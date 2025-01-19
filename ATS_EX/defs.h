@@ -1,24 +1,34 @@
 #pragma once
 
-//If you set this def to 0 project will be compiled without RDS 
-//and everything related to RDS will be excluded from build
-#define USE_RDS 1
+//#define MINIMAL_BUILD
+#define INCLUDE_SERIAL_CONTROL
+#define SERIAL_BAUD_RATE          57600     // 115200
 
-#define EEPROM_APP_ID				235
-#define EEPROM_DATA_START_ADDRESS	1
+// If you remark out USE_RDS, project will be compiled without RDS 
+// and everything related to RDS will be excluded from build
+// Since RDS isn't necessary for operation, removing it from
+// the build allows you to implement Serial control. With it
+// there is no way to get serial to fit...
+#ifndef INCLUDE_SERIAL_CONTROL
+#define USE_RDS
+#endif // !INCLUDE_SERIAL_CONTROL
+
+#define EEPROM_APP_ID				        235
+#define EEPROM_DATA_START_ADDRESS   1
 #define EEPROM_VERSION_ADDRESS      1000
 #define EEPROM_APP_ID_ADDRESS       0
 
-//EEPROM Settings
+// EEPROM Settings
 #define STORE_TIME 10000 // Inactive time to save our settings
 
 // OLED Const values
-#define DEFAULT_FONT FONT8X16POB
-#define RST_PIN -1
-#define RESET_PIN 12
+#define DEFAULT_FONT    FONT8X16POB
+#define RST_PIN         -1
+#define RESET_PIN       12
 
-//Battery charge monitoring analog pin (Voltage divider 10-10 KOhm directly from battery)
-#define BATTERY_VOLTAGE_PIN A2
+// Battery charge monitoring analog pin (Voltage divider 10-10 KOhm directly from battery)
+//#define BATTERY_VOLTAGE_DISPLAY        // If unremarked, removes the code that checks and displays (if found) the voltage divider for reading the battery
+#define BATTERY_VOLTAGE_PIN   A2
 
 // Encoder
 #define ENCODER_PIN_A 2
