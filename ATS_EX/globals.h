@@ -34,7 +34,7 @@ SimpleButton  btn_Mode(MODE_SWITCH);
 
 volatile int g_encoderCount = 0;
 
-//Frequency tracking
+// Frequency tracking
 uint16_t g_currentFrequency;
 uint16_t g_previousFrequency;
 
@@ -65,7 +65,7 @@ void doSWUnits(int8_t v = 0);
 void doSSBSoftMuteMode(int8_t v = 0);
 void doCutoffFilter(int8_t v);
 void doCPUSpeed(int8_t v = 0);
-#if USE_RDS
+#ifdef USE_RDS
 void doRDSErrorLevel(int8_t v);
 #endif
 void doBFOCalibration(int8_t v);
@@ -88,7 +88,7 @@ SettingsItem g_Settings[] =
     { "SSM", 1,  SettingType::Switch,       doSSBSoftMuteMode },  //SSB Soft Mute Mode
     { "COF", 0,  SettingType::SwitchAuto,   doCutoffFilter    },  //SSB Cutoff Filter
     { "CPU", 0,  SettingType::Switch,       doCPUSpeed        },  //CPU Frequency
-#if USE_RDS
+#ifdef USE_RDS
     { "RDS", 1,  SettingType::Num,          doRDSErrorLevel   },  //RDS ErrorLevel
 #endif
     //Page 3
@@ -111,7 +111,7 @@ enum SettingsIndex
     SSM,
     CutoffFilter,
     CPUSpeed,
-#if USE_RDS
+#ifdef USE_RDS
     RDSError,
 #endif
     BFO,
@@ -200,7 +200,7 @@ int8_t g_tabStepFM[] =
 int8_t g_FMStepIndex = 1;
 const int8_t g_lastStepFM = (sizeof(g_tabStepFM) / sizeof(int8_t)) - 1;
 
-//Band table structures
+// Band table structures
 enum BandType : uint8_t
 {
     LW_BAND_TYPE,
