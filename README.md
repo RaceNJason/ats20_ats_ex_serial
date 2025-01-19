@@ -1,4 +1,11 @@
 # ATS_EX Firmware for ATS-20 DSP Receiver
+
+This is an extension of the below project where I have made modifications to allow for serial control of the radio device (via COM port). At the moment it is a first pass work in progress that I've only tested on FM frequencies AFTER the radio is already on the FM band. Although it won't be to much trouble to add functionality for changing bands, frequencies, volume, etc. But for now my underlying purpose is to control a FM radio via UART/COM (which hopefully will come from an ESP32 that is controlled by home assistant).
+
+To control via the COM port you need to have CR-LF line endings active and baud set to 57600 (although you can change this in the defs.h file). The first character is anything (for the moment). It is inteded to be either a control character (to interpret the remaining message) or just a band code. The remaining characters are the frequency. So 102.10 FM would be 010210[CR-LF].
+
+Yes...to get serial control you HAVE to give up something and that something is RDS. As long as you don't care about RDS information (which in my case since the radio will be out of sight it has no use), there is enough space to fit full serial control into the program code (and probably a little more). You cannot have both though so don't ask me to try...
+
 ### Руководство на русском языке можно прочитать здесь (Russian README is here) :
 [>>> Ссылка на русский README. <<<](/rus/README.md)
 
