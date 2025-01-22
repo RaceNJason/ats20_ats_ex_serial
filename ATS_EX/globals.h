@@ -1,6 +1,6 @@
 #pragma once
 
-long g_storeTime = millis();
+unsigned long g_storeTime = millis();
 
 bool g_voltagePinConnnected = false;
 bool g_ssbLoaded = false;
@@ -38,6 +38,13 @@ volatile int g_encoderCount = 0;
 uint16_t g_currentFrequency;
 uint16_t g_previousFrequency;
 
+enum eSeekDir
+{
+    eSeekDown,
+    eSeekUp,
+    eTotSeekDirs
+};
+
 enum SettingType
 {
     ZeroAuto,
@@ -67,7 +74,7 @@ void doCutoffFilter(int8_t v);
 void doCPUSpeed(int8_t v = 0);
 #ifdef USE_RDS
 void doRDSErrorLevel(int8_t v);
-#endif
+#endif // USE_RDS
 void doBFOCalibration(int8_t v);
 void doUnitsSwitch(int8_t v = 0);
 void doScanSwitch(int8_t v = 0);
@@ -90,7 +97,7 @@ SettingsItem g_Settings[] =
     { "CPU", 0,  SettingType::Switch,       doCPUSpeed        },  //CPU Frequency
 #ifdef USE_RDS
     { "RDS", 1,  SettingType::Num,          doRDSErrorLevel   },  //RDS ErrorLevel
-#endif
+#endif // USE_RDS
     //Page 3
     { "BFO", 0,  SettingType::Num,          doBFOCalibration  },  //BFO Offset calibration
     { "Uni", 1,  SettingType::Switch,       doUnitsSwitch     },  //Show/Hide frequency units
@@ -113,7 +120,7 @@ enum SettingsIndex
     CPUSpeed,
 #ifdef USE_RDS
     RDSError,
-#endif
+#endif // USE_RDS
     BFO,
     UnitsSwitch,
     ScanSwitch,
@@ -126,7 +133,7 @@ int8_t g_SettingSelected = 0;
 int8_t g_SettingsPage = 1;
 bool g_SettingEditing = false;
 
-//For managing BW
+// For managing BW
 struct Bandwidth
 {
     uint8_t idx;      //Internal SI473X index
@@ -218,7 +225,7 @@ struct Band
     int8_t bandwidthIdx;     // Bandwidth table index (internal table in Si473x controller)
 };
 
-#if USE_RDS
+#ifdef USE_RDS
 enum RDSActiveInfo : uint8_t
 {
     StationName,
@@ -228,7 +235,7 @@ enum RDSActiveInfo : uint8_t
 uint8_t g_rdsActiveInfo = RDSActiveInfo::StationName;
 char g_rdsPrevLen = 0;
 char* g_RDSCells[3];
-#endif
+#endif // USE_RDS
 
 char _literal_EmptyLine[17] = "                ";
 
