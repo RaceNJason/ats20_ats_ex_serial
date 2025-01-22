@@ -466,10 +466,11 @@ bool checkStopSeeking()
 
 void doSeek()
 {
-    if (g_seekDirection)
-        g_si4735.frequencyUp();
-    else
+    // Duplicate the original logic by seeking down only if 0...everything else is seek up
+    if (g_seekDirection == eSeekDown)
         g_si4735.frequencyDown();
+    else
+        g_si4735.frequencyUp();
 
 #ifdef USE_RDS
     if (g_displayRDS)
@@ -1538,7 +1539,7 @@ bool clampSSBBand()
 
 void doFrequencyTune()
 {
-    g_seekDirection = g_encoderCount == 1 ? 1 : 0;
+    g_seekDirection = (g_encoderCount == 1 ? eSeekUp : eSeekDown);
 
     // Update frequency
     g_previousFrequency = g_currentFrequency; // Force EEPROM update
@@ -1620,7 +1621,7 @@ void doFrequencyTuneSSB()
 #ifdef INCLUDE_SERIAL_CONTROL
 void ReadSerialData()
 {
-    // char pSerialBuffer[20];
+    // char pSerialBuffer[MAX_SERIAL_BUFFER_SIZE];
     // uint8_t nSerialBufferPos = 0;
     bool bMsgEnd = false;
     while (Serial.available() > 0 && bMsgEnd == false)
@@ -1632,27 +1633,94 @@ void ReadSerialData()
         nSerialBufferPos++;
         if (nSerialBufferPos >= MAX_SERIAL_BUFFER_SIZE)
             nSerialBufferPos = 0;
-    }
-    if (bMsgEnd == true)
-    {
-        // First byte is the band code
-        // Remaining bytes is the frequency in char/string form
-        nSerialBufferPos = 0;
-        uint8_t nCode = *(uint8_t*)m_pSerialBuffer;
-        char* pSerialBuffer = m_pSerialBuffer;
-        pSerialBuffer++;
-        g_currentFrequency = atoi(pSerialBuffer);
-        //g_processFreqChange = true;
-        g_encoderCount = 0;
-        g_si4735.setFrequency(g_currentFrequency);
-        g_currentFrequency = g_si4735.getFrequency();    // Not sure if this corrects any irregular frequencies. But for the moment we don't do any sanity checks so this is the next best thing??
-        g_bandList[g_bandIndex].currentFreq = g_currentFrequency;
-        //applyBandConfiguration();                      // This is only if we are changing bands. At the moment we are only supporting FM band...
 
-        g_lastFreqChange = millis();
-        g_previousFrequency = 0;  // Force EEPROM update
-        if (!clampSSBBand())      // If we move outside of current band - switch it
-            showFrequency();
+        if (bMsgEnd == true)
+        {
+            // First byte is the band code
+            // Remaining bytes is the frequency in char/string form
+            nSerialBufferPos = 0;
+            uint8_t vol(0);
+            char cCode = *m_pSerialBuffer;
+            uint8_t nCode = atoi(cCode);
+            char* pSerialBuffer = m_pSerialBuffer;
+            pSerialBuffer++;
+            switch (nCode)
+            {
+            case eFMFreqBand:
+                // If we are not currently on the FM freq band...do we need to change the band first?
+                g_currentFrequency = atoi(pSerialBuffer);
+                //g_processFreqChange = true;
+                g_encoderCount = 0;
+                g_si4735.setFrequency(g_currentFrequency);
+                g_currentFrequency = g_si4735.getFrequency();    // Not sure if this corrects any irregular frequencies. But for the moment we don't do any sanity checks so this is the next best thing??
+                g_bandList[g_bandIndex].currentFreq = g_currentFrequency;
+                //applyBandConfiguration();                      // This is only if we are changing bands. At the moment we are only supporting FM band...
+
+                g_lastFreqChange = millis();
+                g_previousFrequency = 0;  // Force EEPROM update
+                if (!clampSSBBand())      // If we move outside of current band - switch it
+                    showFrequency();
+                break;
+
+            case eAMFreqBand:
+                // If we are not currently on the AM freq band...do we need to change the band first?
+                break;
+
+            case eSBFreqBand:
+                // If we are not currently on the SB freq band...do we need to change the band first?
+                break;
+
+            case eScanUp:
+                // Seek in SSB/CW is not allowed
+                if (g_currentMode == FM || g_currentMode == AM)
+                {
+                    g_seekDirection = eSeekUp;
+                    doSeek();
+                }
+                break;
+
+            case eScanDown:
+                // Seek in SSB/CW is not allowed
+                if (g_currentMode == FM || g_currentMode == AM)
+                {
+                    g_seekDirection = eSeekDown;
+                    doSeek();
+                }
+                break;
+
+            case eVolume:
+                vol = (uint8_t)atoi(pSerialBuffer);
+                if (vol > 0)
+                {
+                    g_muteVolume = 0;   // Let's make sure any mute operation is cleared...
+                    g_si4735.setVolume(atoi(pSerialBuffer));
+                    showVolume();
+                    break;    // We are done here so we can exit the switch statement
+                }
+                else  // We are trying to mute by setting the volume to zero, drop down thru mute and just clear the g_muteVolume flag here to make sure we trigger the right one
+                    g_muteVolume = 0;
+                // Continue thru to mute
+
+            case eMute:
+                // This is a brainless flipflop with the flag being the g_muteVolume being set to something other than 0
+                vol = g_si4735.getCurrentVolume();
+                if (vol > 0 && g_muteVolume == 0)
+                {
+                    g_muteVolume = vol;
+                    g_si4735.setVolume(0);
+                }
+                else if (g_muteVolume > 0)
+                {
+                    g_si4735.setVolume(g_muteVolume);
+                    g_muteVolume = 0;
+                }
+                showVolume();
+                break;
+
+            default:  // Possible error, anyway this at least resets the message buffer so the message could be tried again. For dynamic handlying maybe a 'success' return code could be done.
+                break;
+            }
+        }
     }
 }
 #endif // INCLUDE_SERIAL_CONTROL
@@ -1660,8 +1728,7 @@ void ReadSerialData()
 void loop()
 {
 #ifdef INCLUDE_SERIAL_CONTROL
-    if (Serial.available() > 0)
-        ReadSerialData();
+    ReadSerialData();         // Let's just call it everytime rather than check if serial data is available. Doing it this way technically saves a call to this function every pass...
 #endif // INCLUDE_SERIAL_CONTROL
     uint8_t x;
     bool skipButtonEvents = false;
@@ -1697,7 +1764,7 @@ void loop()
 #endif // BATTERY_VOLTAGE_DISPLAY
 
 #ifdef INCLUDE_SERIAL_CONTROL
-        //Serial.println(g_currentFrequency);
+        //Serial.println(g_currentFrequency);   // Debug purposes only to determine how the current frequency for a given band is represented...
 #endif // INCLUDE_SERIAL_CONTROL
     }
 
@@ -1801,6 +1868,7 @@ void loop()
         if (!g_settingsActive && g_muteVolume == 0)
             switchCommand(&g_cmdVolume, showVolume);
     }
+    // This is an overriden 'mute' button
     if (BUTTONEVENT_SHORTPRESS == btn_VolumeDn.checkEvent(volumeEvent))
     {
         if (!g_cmdVolume)
