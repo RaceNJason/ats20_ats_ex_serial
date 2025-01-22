@@ -9,7 +9,19 @@
 // Since RDS isn't necessary for operation, removing it from
 // the build allows you to implement Serial control. With it
 // there is no way to get serial to fit...
-#ifndef INCLUDE_SERIAL_CONTROL
+#ifdef INCLUDE_SERIAL_CONTROL
+enum eSerialCtlCmds
+{
+  eFMFreqBand,
+  eAMFreqBand,
+  eSBFreqBand,
+  eScanUp,
+  eScanDown,
+  eVolume,
+  eMute,
+  eTotSerialCtlCmds
+};
+#else // !INCLUDE_SERIAL_CONTROL
 #define USE_RDS
 #endif // !INCLUDE_SERIAL_CONTROL
 
@@ -27,8 +39,9 @@
 #define RESET_PIN       12
 
 // Battery charge monitoring analog pin (Voltage divider 10-10 KOhm directly from battery)
-//#define BATTERY_VOLTAGE_DISPLAY        // If unremarked, removes the code that checks and displays (if found) the voltage divider for reading the battery
-#define BATTERY_VOLTAGE_PIN   A2
+#define BATTERY_VOLTAGE_DISPLAY        // If unremarked, removes the code that checks and displays (if found) the voltage divider for reading the battery
+#define BATTERY_VOLTAGE_PIN   A1       // This originally showed A2, but in the online schematic they show using the A1 pin (and the A0 pin being used for the encoder)
+                                       // So if you wire up your battery voltage divider and notice the display still shows 0, double check which analog pin you wired it too
 
 // Encoder
 #define ENCODER_PIN_A 2
