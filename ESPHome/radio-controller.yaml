@@ -1,0 +1,347 @@
+substitutions:
+  name: "radio-controller"
+  friendly_name: Radio Controller
+  ap_ssid: "Radio Controller"
+  encryption_key: !secret Encryption_Key_Radio_Controller
+  ota_password: !secret OTA_Password_Radio_Controller
+
+# PINS
+# GPIO17    UART1 TX
+# GPIO18    UART1 RX
+# GPIO19    USB_CDC/USB_SERIAL_JTAG
+# GPIO20    USB_CDC/USB_SERIAL_JTAG
+# GPIO43    UART0 TX/USB UART TX
+# GPIO44    UART0 RX/USB UART RX
+
+# Enumerator embedded in the Radio firmware
+#enum eSerialCtlCmds
+#{
+#  eFMFreqBand,     0
+#  eAMFreqBand,     1
+#  eSBFreqBand,     2
+#  eScanUp,         3
+#  eScanDown,       4
+#  eVolume,         5
+#  eMute,           6
+#  eTotSerialCtlCmds
+#};
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  min_version: 2024.6.0
+  name_add_mac_suffix: false
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: ESP32S3
+  flash_size: 16MB
+  framework:
+    type: arduino
+    version: latest
+
+# Enable logging
+logger:
+  baud_rate: 57600
+  #tx_buffer_size: 512
+  #deassert_rts_dtr: false
+  hardware_uart: USB_CDC    # USB_CDC is the default; UART0 is the alternate (at least for USB cable access)
+  #level: DEBUG
+  #logs: {}
+
+# Enable Home Assistant API and failsafe mechanisms
+api:
+  encryption:
+    key: ${encryption_key}
+
+# Allow Over-The-Air updates
+ota:
+- platform: esphome
+  password: ${ota_password}
+  
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  
+ # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: ${ap_ssid}
+    password: !secret wifi_password
+
+captive_portal:
+
+uart:
+  id: uart_bus
+  baud_rate: 57600
+  tx_pin: GPIO43
+  rx_pin: GPIO44
+  debug:
+    direction: RX
+    dummy_receiver: true
+    after:
+      delimiter: "\r\n"
+    sequence:
+      - lambda: |-          
+          char cCmd = (char)bytes[0];
+          const char* pData = reinterpret_cast<const char*>(&bytes[1]);
+          uint8_t nCmd = (cCmd - char('0'));
+          uint8_t nVol = 0;
+          switch (nCmd)
+          {
+          case 0:
+            id(fm_frequency).publish_state((atoi(pData) / 100.0));
+            break;
+
+          case 5:
+            nVol = atoi(pData);
+            nVol = (((nVol / 63.0) * 101) - 0.5);
+            if (nVol < 0)
+              nVol = 0;
+            if (nVol > 100)
+              nVol = 100;
+            id(volume_ctrl).publish_state(nVol);
+            break;
+
+          case 6:
+            id(vol_mute).publish_state(!id(vol_mute).state);
+            break;
+
+          default:
+            break;
+          }
+
+globals:
+   - id: global_vol
+     type: int
+     restore_value: yes
+     initial_value: '0'
+
+number:
+  - platform: template
+    id: volume_ctrl
+    min_value: 0
+    max_value: 100
+    step: 1
+    optimistic: True
+    name: "Volume"
+    icon: mdi:volume-high
+    restore_value: True
+    initial_value: 50
+    on_value: 
+      then:
+        - lambda: !lambda |-
+            if (id(volume_ctrl).state > 0) {
+              if (id(global_vol) > 0) {
+                id(global_vol) = 0;
+                id(vol_mute).publish_state(false);
+                }
+              }
+        - uart.write: '5'
+        - uart.write: !lambda
+                         char buf[12];
+                         float fScaledVol = (((id(volume_ctrl).state / 100.0) * 64) - 0.5);
+                         if (fScaledVol < 0.0)
+                           fScaledVol = 0.0;
+                         if (fScaledVol > 63.0)
+                           fScaledVol = 63.0;
+                         sprintf(buf, "%0.0f", fScaledVol);
+                         std::string s = buf;
+                         return std::vector<unsigned char>( s.begin(), s.end() );
+        - uart.write: [0x0D,0x0A]
+        
+  - platform: template
+    id: fm_frequency
+    min_value: 88
+    max_value: 108
+    step: 0.1  # Technically the SI4735 does 0.01
+    mode: box
+    optimistic: True
+    name: "FM Frequency"
+    icon: mdi:radio
+    restore_value: True
+    initial_value: 102.1
+    on_value: 
+      then:
+        - uart.write: '0'
+        - uart.write: !lambda
+                         char buf[12];
+                         sprintf(buf, "%0.0f", (id(fm_frequency).state * 100));
+                         std::string s = buf;
+                         return std::vector<unsigned char>( s.begin(), s.end() );
+        - uart.write: [0x0D,0x0A]
+    
+  - platform: template
+    id: am_frequency
+    min_value: 540
+    max_value: 1700
+    step: 10  # Technically the SI4735 does 1
+    mode: box
+    optimistic: True
+    name: "AM Frequency"
+    icon: mdi:radio
+    restore_value: True
+    initial_value: 840
+    on_value: 
+      then:
+        - uart.write: '1'
+        - uart.write: !lambda
+                         char buf[12];
+                         sprintf(buf, "%0.0f", (id(am_frequency).state * 10));
+                         std::string s = buf;
+                         return std::vector<unsigned char>( s.begin(), s.end() );
+        - uart.write: [0x0D,0x0A]
+
+button:
+  - platform: template
+    name: "Scan Up"
+    icon: mdi:radio
+    on_press: 
+      then:
+        - uart.write: '3'
+        - uart.write: [0x0D,0x0A]
+    
+  - platform: template
+    name: "Scan Down"
+    icon: mdi:radio
+    on_press: 
+      then:
+        - uart.write: '4'
+        - uart.write: [0x0D,0x0A]
+   
+switch:
+  - platform: template
+    id: vol_mute
+    name: "Mute"
+    icon: mdi:volume-off
+    optimistic: True
+    restore_mode: RESTORE_DEFAULT_OFF
+    on_turn_on:
+      then:
+        - lambda: !lambda |-
+            id(global_vol) = int(id(volume_ctrl).state);
+            id(volume_ctrl).publish_state(0);
+        
+    on_turn_off:
+      then:
+        - lambda: !lambda |-
+            if (id(global_vol) > 0) {
+              id(volume_ctrl).publish_state(id(global_vol));
+              id(global_vol) = 0;
+              }
+              
+  - platform: restart
+    name: Restart ${name}
+    
+  - platform: factory_reset
+    name: Reset ${name}
+    
+  - platform: shutdown
+    name: Shutdown ${name}
+              
+light:
+  - platform: neopixelbus
+    id: led_sk6812              # Provides control from within...
+    variant: sk6812
+    pin: GPIO48
+    num_leds: 1
+    #type: GRB                  # GRB is the default so unremark only if you are using something other than GRB
+    name: "RGB LED"
+    #restore_mode: ALWAYS_OFF   # ALWAYS_OFF is the default so unremark only if you are using something other than ALWAYS_OFF
+
+# Debugging/Status stuff... set 'disabled_by_default: true' if you don't want these showing up by default, remark/delete out to remove entirely
+debug:
+  update_interval: 5s
+
+sensor:
+  - platform: wifi_signal           # WiFi signal strength in dB; NOTE: This is needed if you want the WiFi signal strength in % variable below to be available.
+    name: "WiFi Signal"
+    id: wifi_signal_db
+    update_interval: 60s
+    #disabled_by_default: true
+
+  - platform: copy                  # Reports the above WiFi signal strength in %
+    source_id: wifi_signal_db
+    name: "WiFi Signal Strength"
+    filters:
+      - lambda: return min(max(2 * (x + 100.0), 0.0), 100.0);
+    unit_of_measurement: " %"
+    entity_category: "diagnostic"
+    device_class: ""
+    #disabled_by_default: true
+
+  - platform: uptime                # Seconds since last boot
+    name: "Uptime"
+    disabled_by_default: false
+    force_update: false
+    unit_of_measurement: s
+    icon: mdi:timer-outline
+    accuracy_decimals: 0
+    device_class: duration
+    state_class: total_increasing
+    entity_category: diagnostic
+    update_interval: 60s
+    #disabled_by_default: true
+
+#  - platform: debug
+#    free:
+#      name: "Heap Free"
+#      #disabled_by_default: true
+
+#    fragmentation:                 # Only available on ESP8266
+#      name: "Heap Fragmentation"
+#      #disabled_by_default: true
+
+#    block:
+#      name: "Heap Max Block"
+#      #disabled_by_default: true
+
+#    loop_time:
+#      name: "Loop Time"
+#      #disabled_by_default: true
+
+#    psram:                         # Only available on ESP32
+#      name: "Free PSRAM"
+#      #disabled_by_default: true
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "IP"
+      icon: "mdi:ip-outline"
+      #disabled_by_default: true
+
+    ssid:
+      name: "SSID"
+      icon: "mdi:wifi-settings"
+      #disabled_by_default: true
+
+    bssid:
+      name: "BSSID"
+      icon: "mdi:wifi-settings"
+      #disabled_by_default: true
+
+    mac_address:
+      name: "MAC"
+      icon: "mdi:network-outline"
+      #disabled_by_default: true
+
+    scan_results:
+      name: "Wifi Scan"
+      icon: "mdi:wifi-refresh"
+      disabled_by_default: true   # This is just here...because it can be, so disable by default since you don't want this running all the time!
+
+  - platform: version
+    name: ${friendly_name} Version
+    hide_timestamp: true
+    disabled_by_default: false
+    icon: mdi:new-box
+    entity_category: diagnostic
+      #disabled_by_default: true
+
+#  - platform: debug
+#    device:
+#      name: "Device Info"
+#     #disabled_by_default: true
+#    reset_reason:
+#      name: "Reset Reason"
+#     #disabled_by_default: true
