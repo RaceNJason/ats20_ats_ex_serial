@@ -39,7 +39,10 @@ enum eSerialCtlCmds
 #define RESET_PIN       12
 
 // Battery charge monitoring analog pin (Voltage divider 10-10 KOhm directly from battery)
+#ifndef INCLUDE_SERIAL_CONTROL         // As long as we code in feedback information (like local volume or scanning changes), there is no room for battery voltage display
+                                       // NOTE: IF you remark (or delete out) the INCLUDE_SERIAL_CONTROL condition, the feedback information will automatically be removed!!
 #define BATTERY_VOLTAGE_DISPLAY        // If unremarked, removes the code that checks and displays (if found) the voltage divider for reading the battery
+#endif // !INCLUDE_SERIAL_CONTROL
 #define BATTERY_VOLTAGE_PIN   A1       // This originally showed A2, but in the online schematic they show using the A1 pin (and the A0 pin being used for the encoder)
                                        // So if you wire up your battery voltage divider and notice the display still shows 0, double check which analog pin you wired it too
 
