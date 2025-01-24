@@ -206,8 +206,8 @@ uint8_t simpleEvent(uint8_t event, uint8_t pin)
     return event;
 }
 
-//This looks like it's better to remove them and use only simpleEvent
-//But it's a part of a hack that allows us to save 2 bytes of flash image size
+// This looks like it's better to remove them and use only simpleEvent
+// But it's a part of a hack that allows us to save 2 bytes of flash image size
 uint8_t stepEvent(uint8_t event, uint8_t pin)
 {
     return simpleEvent(event, pin);
@@ -732,7 +732,6 @@ void showVolume()
         convertToChar(buf, g_si4735.getCurrentVolume(), 2, 0, 0);
     else
     {
-        //memcpy(buf, " M0", 3);
         buf[0] = ' ';
         buf[1] = 'M';
         buf[2] = 0;
@@ -753,20 +752,20 @@ void showCharge(bool forceShow)
 
     // mV, Percent
     // This values represent voltage values in ATMega328p analog units with reference voltage 3.30v
-    // Voltage pin reads voltage from voltage divider, so it have to be 1/2 of Li-Ion battery voltage
+    // Voltage pin reads voltage from voltage divider, so it has to be 1/2 of Li-Ion battery voltage
     constexpr const uint8_t rows = 10;
     const uint16_t dischargeTable[rows][2] =
     {
-        { 643, 100 },  //4.15v
-        { 620, 95  },  //4.05v
-        { 604, 90  },  //3.90v
-        { 581, 80  },  //3.75v
-        { 573, 60  },  //3.70v
-        { 558, 40  },  //3.60v
-        { 542, 20  },  //3.50v
-        { 503, 15  },  //3.25v
-        { 496, 5  },   //3.20v
-        { 488, 0  },   //3.15v
+        { 643, 100 },  // 4.15v
+        { 620, 95  },  // 4.05v
+        { 604, 90  },  // 3.90v
+        { 581, 80  },  // 3.75v
+        { 573, 60  },  // 3.70v
+        { 558, 40  },  // 3.60v
+        { 542, 20  },  // 3.50v
+        { 503, 15  },  // 3.25v
+        { 496, 5  },   // 3.20v
+        { 488, 0  },   // 3.15v
     };
 
     auto getBatteryPercentage = [&](uint16_t currentSamples) -> uint8_t
@@ -961,7 +960,7 @@ void showSMeter()
     sMeterUpdated = millis();
 }
 
-//Draw bandwidth (Ignored for CW mode)
+// Draw bandwidth (Ignored for CW mode)
 void showBandwidth()
 {
     char* bw;
@@ -1172,7 +1171,7 @@ void applyBandConfiguration(bool extraSSBReset = false)
     resetEEPROMDelay();
 }
 
-//Step value regulation
+// Step value regulation
 void doStep(int8_t v)
 {
     if (g_currentMode == FM)
@@ -1196,11 +1195,11 @@ void doStep(int8_t v)
         else if (g_stepIndex < 0)
             g_stepIndex = getLastStep();
 
-        //SSB Step limit
+        // SSB Step limit
         else if (isSSB() && g_stepIndex >= g_amTotalStepsSSB && g_stepIndex < g_amTotalSteps)
             g_stepIndex = v == 1 ? g_amTotalSteps : g_amTotalStepsSSB - 1;
         
-        //LW/MW Step limit
+        // LW/MW Step limit
         else if ((g_bandIndex == LW_BAND_TYPE || g_bandIndex == MW_BAND_TYPE)
             && v == 1 && g_stepIndex > g_amTotalStepsSSB && g_stepIndex < g_amTotalSteps)
             g_stepIndex = g_amTotalSteps;
@@ -1222,11 +1221,11 @@ void doStep(int8_t v)
 
 void updateBFO()
 {
-    //Actually to move frequency forward you need to move BFO backwards, so just * -1
+    // Actually to move frequency forward you need to move BFO backwards, so just * -1
     g_si4735.setSSBBfo((g_currentBFO + (g_Settings[SettingsIndex::BFO].param * 10)) * -1);
 }
 
-//Volume control
+// Volume control
 void doVolume(int8_t v)
 {
     if (g_muteVolume)
@@ -1244,7 +1243,7 @@ void doVolume(int8_t v)
     showVolume();
 }
 
-//Helps to save more flash image size
+// Helps to save more flash image size
 void doSwitchLogic(int8_t& param, int8_t low, int8_t high, int8_t step)
 {
     param += step;
@@ -1505,7 +1504,7 @@ void switchCommand(bool* b, void (*showFunction)())
 
 bool clampSSBBand()
 {
-    uint16_t freq = g_currentFrequency + (g_currentBFO / 1000);
+    uint16_t freq = (g_currentFrequency + (g_currentBFO / 1000));
     auto bfoReset = [&]()
     {
         g_currentBFO = 0;
@@ -1613,14 +1612,42 @@ void doFrequencyTuneSSB()
 
     g_bandList[g_bandIndex].currentFreq = g_currentFrequency + (g_currentBFO / 1000);
     g_lastFreqChange = millis();
-    g_previousFrequency = 0; //Force EEPROM update
-    if (!clampSSBBand()) //If we move outside of current band - switch it
+    g_previousFrequency = 0;  // Force EEPROM update
+    if (!clampSSBBand())      // If we move outside of current band - switch it
         showFrequency();
 }
 
 #ifdef INCLUDE_SERIAL_CONTROL
-void ReadSerialData()
+void ManageSerialData()
 {
+#ifndef BATTERY_VOLTAGE_DISPLAY   // If we define the battery voltage display we cannot fit the below in program memory...
+    // Writing/feedback part...
+    static uint16_t nLastFreq = g_currentFrequency;
+    static uint8_t nLastVol = g_si4735.getCurrentVolume();
+    if (nLastFreq != g_currentFrequency)    // This should capture scan results and in progress scans too...
+    {
+        //Serial.println(g_currentFrequency);   // Debug purposes only to determine how the current frequency for a given band is represented...
+        nLastFreq = g_currentFrequency;
+        if (g_currentMode == FM)
+        {
+            Serial.print(eFMFreqBand);
+            Serial.println(nLastFreq);
+        }
+    }
+    uint8_t nCurVol = g_si4735.getCurrentVolume();  // Don't call twice, just buffer the value instead
+    if (nLastVol != nCurVol)
+    {
+        nLastVol = nCurVol;
+        if (nCurVol == 0)                  // We just automatically call a 0 volume as Mute regardless...
+            Serial.print(eMute);
+        else
+        {
+            Serial.print(eVolume);
+            Serial.println(nCurVol);
+        }
+    }
+#endif // !BATTERY_VOLTAGE_DISPLAY
+    // Reading part...
     // char pSerialBuffer[MAX_SERIAL_BUFFER_SIZE];
     // uint8_t nSerialBufferPos = 0;
     bool bMsgEnd = false;
@@ -1641,20 +1668,24 @@ void ReadSerialData()
             nSerialBufferPos = 0;
             uint8_t vol(0);
             char cCode = *m_pSerialBuffer;
-            uint8_t nCode = atoi(cCode);
+            uint8_t nCode = (cCode - char('0'));
             char* pSerialBuffer = m_pSerialBuffer;
             pSerialBuffer++;
             switch (nCode)
             {
             case eFMFreqBand:
-                // If we are not currently on the FM freq band...do we need to change the band first?
+                // If we are not currently on the FM freq band...do we need to change the band first? Not sure so instead we just abandon the request all together...
+                if (g_currentMode != FM)
+                    break;
+
                 g_currentFrequency = atoi(pSerialBuffer);
-                //g_processFreqChange = true;
+#ifndef BATTERY_VOLTAGE_DISPLAY   // If we define the battery voltage display we cannot fit the below in program memory...
+                nLastFreq = g_currentFrequency;                 // If we are coming in from the device, we don't need to notify it above so update last freq
+#endif // !BATTERY_VOLTAGE_DISPLAY
                 g_encoderCount = 0;
                 g_si4735.setFrequency(g_currentFrequency);
                 g_currentFrequency = g_si4735.getFrequency();    // Not sure if this corrects any irregular frequencies. But for the moment we don't do any sanity checks so this is the next best thing??
                 g_bandList[g_bandIndex].currentFreq = g_currentFrequency;
-                //applyBandConfiguration();                      // This is only if we are changing bands. At the moment we are only supporting FM band...
 
                 g_lastFreqChange = millis();
                 g_previousFrequency = 0;  // Force EEPROM update
@@ -1694,6 +1725,9 @@ void ReadSerialData()
                 {
                     g_muteVolume = 0;   // Let's make sure any mute operation is cleared...
                     g_si4735.setVolume(atoi(pSerialBuffer));
+#ifndef BATTERY_VOLTAGE_DISPLAY   // If we define the battery voltage display we cannot fit the below in program memory...
+                    nLastVol = g_si4735.getCurrentVolume();       // If we are coming in from the device, we don't need to notify it above so update last volume right now
+#endif // !BATTERY_VOLTAGE_DISPLAY
                     showVolume();
                     break;    // We are done here so we can exit the switch statement
                 }
@@ -1728,7 +1762,7 @@ void ReadSerialData()
 void loop()
 {
 #ifdef INCLUDE_SERIAL_CONTROL
-    ReadSerialData();         // Let's just call it everytime rather than check if serial data is available. Doing it this way technically saves a call to this function every pass...
+    ManageSerialData();
 #endif // INCLUDE_SERIAL_CONTROL
     uint8_t x;
     bool skipButtonEvents = false;
@@ -1762,10 +1796,6 @@ void loop()
 #ifdef BATTERY_VOLTAGE_DISPLAY
         showCharge(false);
 #endif // BATTERY_VOLTAGE_DISPLAY
-
-#ifdef INCLUDE_SERIAL_CONTROL
-        //Serial.println(g_currentFrequency);   // Debug purposes only to determine how the current frequency for a given band is represented...
-#endif // INCLUDE_SERIAL_CONTROL
     }
 
     if (g_lastAdjustmentTime != 0 && millis() - g_lastAdjustmentTime > ADJUSTMENT_ACTIVE_TIMEOUT)
