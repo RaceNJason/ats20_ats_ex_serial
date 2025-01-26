@@ -1748,6 +1748,9 @@ void ManageSerialData()
                     g_si4735.setVolume(g_muteVolume);
                     g_muteVolume = 0;
                 }
+#ifndef BATTERY_VOLTAGE_DISPLAY   // If we define the battery voltage display we cannot fit the below in program memory...
+                nLastVol = g_si4735.getCurrentVolume();       // If we are coming in from the device, we don't need to notify it above so update last volume right now
+#endif // !BATTERY_VOLTAGE_DISPLAY
                 showVolume();
                 break;
 
