@@ -378,7 +378,7 @@ void showFrequency(bool cleanDisplay = false)
     uint16_t khzBFO, tailBFO;
     uint8_t off = (isSSB() ? -5 : 4) + 8;
 
-    unit[0] = 'K';
+    unit[0] = 'k';
     unit[1] = 'H';
     unit[2] = 'z';
     unit[3] = 0x0;
@@ -570,7 +570,7 @@ void SettingParamToUI(char* buf, uint8_t idx)
         else if (idx == SettingsIndex::SWUnits)
         {
             if (param == 0)
-                buf[0] = 'K';
+                buf[0] = 'k';
             else
                 buf[0] = 'M';
             buf[1] = 'H';
